@@ -1,0 +1,4 @@
+interface:
+  display_name: "Citation Audit"
+  short_description: "Check claim-citation-evidence integrity for LaTeX drafts."
+  default_prompt: "Use $citation-audit to verify important claims are cited, citations are supported, and bib/text consistency is correct."

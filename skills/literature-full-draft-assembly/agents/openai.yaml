@@ -1,0 +1,4 @@
+interface:
+  display_name: "Literature Full Draft Assembly"
+  short_description: "Assemble chapter drafts into a full LaTeX draft with conservative global revision and review reporting."
+  default_prompt: "Use $literature-full-draft-assembly to generate draft/main.tex, draft/full_draft_v1.tex, and draft/reports/full_draft_review.md from audited chapter drafts."

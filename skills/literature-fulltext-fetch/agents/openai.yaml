@@ -1,0 +1,4 @@
+interface:
+  display_name: "Literature Fulltext Fetch"
+  short_description: "Download PDFs for included candidates with audit logs."
+  default_prompt: "Use $literature-fulltext-fetch to download fulltext PDFs for included candidates and record per-paper outcomes."

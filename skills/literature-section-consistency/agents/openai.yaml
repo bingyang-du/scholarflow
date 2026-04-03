@@ -1,0 +1,4 @@
+interface:
+  display_name: "Literature Section Consistency"
+  short_description: "Revise drafted section tex files for intra-section coherence and evidence-bounded flow."
+  default_prompt: "Use $literature-section-consistency to revise section drafts with deterministic consistency rules and output a run-level section_consistency_report.json."

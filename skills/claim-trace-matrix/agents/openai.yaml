@@ -1,0 +1,4 @@
+interface:
+  display_name: "Claim Trace Matrix"
+  short_description: "Generate claim trace matrix CSV/JSON for evidence-chain auditing."
+  default_prompt: "Use $claim-trace-matrix to export claim traceability artifacts from claims, plans, packets, and bibliography."

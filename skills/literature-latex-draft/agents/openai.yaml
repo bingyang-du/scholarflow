@@ -1,0 +1,4 @@
+interface:
+  display_name: "Literature LaTeX Draft"
+  short_description: "Generate modular LaTeX draft files from argument graph outputs."
+  default_prompt: "Use $literature-latex-draft to generate main.tex, section files, references.bib, and figure/table include fragments from structured evidence outputs."

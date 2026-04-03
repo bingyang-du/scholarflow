@@ -1,0 +1,4 @@
+interface:
+  display_name: "Cross Section Bridge"
+  short_description: "Generate bridge plan and LaTeX bridge fragment across adjacent sections."
+  default_prompt: "Use $cross-section-bridge to create draft/bridges/bridge_plan.json and draft/latex/sections/bridges.tex."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "LaTeX Build QA"
+  short_description: "Run static and optional compile checks for manuscript LaTeX outputs."
+  default_prompt: "Use $latex-build-qa to generate a build QA report and log for main/full draft tex files."

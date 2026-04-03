@@ -1,0 +1,5 @@
+interface:
+  display_name: "Literature Paragraph Planning"
+  short_description: "Convert section plan into paragraph-level writing units with claim evidence mapping."
+  default_prompt: "Use $literature-paragraph-planning to split each section into paragraph plans with purpose, core claim, and required claim_id evidence."
+

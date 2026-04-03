@@ -1,0 +1,5 @@
+interface:
+  display_name: "Literature Section Drafting"
+  short_description: "Draft section tex paragraph-by-paragraph from evidence packets."
+  default_prompt: "Use $literature-section-drafting to generate section drafts from paragraph plans and evidence packets, writing rationale records before LaTeX prose."
+

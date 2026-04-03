@@ -1,0 +1,4 @@
+interface:
+  display_name: "Section Release Gate"
+  short_description: "Gate a section into go/revise/block based on section audit artifacts."
+  default_prompt: "Use $section-release-gate to produce section gate JSON and fixlist markdown from consistency and citation audit reports."

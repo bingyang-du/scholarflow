@@ -1,0 +1,5 @@
+interface:
+  display_name: "Literature Evidence Packeting"
+  short_description: "Prepare paragraph-level evidence packets with support, conflicts, and strength labels."
+  default_prompt: "Use $literature-evidence-packeting to assemble evidence packets from paragraph plans, claims, cards, included candidates, and bibliography."
+

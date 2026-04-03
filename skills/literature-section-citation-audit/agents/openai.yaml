@@ -1,0 +1,4 @@
+interface:
+  display_name: "Literature Section Citation Audit"
+  short_description: "Run single-section citation integrity audit before drafting the next chapter."
+  default_prompt: "Use $literature-section-citation-audit to audit one section tex file against evidence packets and bibliography, then emit section_<stem>_audit.json/md."

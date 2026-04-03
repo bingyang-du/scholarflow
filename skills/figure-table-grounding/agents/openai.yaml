@@ -1,0 +1,4 @@
+interface:
+  display_name: "Figure Table Grounding"
+  short_description: "Audit figure/table references, labels, and claim linkage."
+  default_prompt: "Use $figure-table-grounding to generate figure/table grounding report and manifest JSON."
