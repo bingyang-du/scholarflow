@@ -1,0 +1,4 @@
+interface:
+  display_name: "Literature Cardify"
+  short_description: "Create structured evidence cards from candidates."
+  default_prompt: "Use $literature-cardify to convert candidates into cards.jsonl with relevance scores and body inclusion suggestions."

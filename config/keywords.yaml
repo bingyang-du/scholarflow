@@ -1,0 +1,20 @@
+topics:
+  - pentene isomerization
+  - zsm-5 catalyst
+  - zeolite reaction mechanism
+  - olefin conversion
+
+synonyms:
+  pentene:
+    - 1-pentene
+    - n-pentene
+  zsm5:
+    - zsm-5
+    - mfi zeolite
+
+filters:
+  years:
+    start: 2015
+    end: 2026
+  languages:
+    - en

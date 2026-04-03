@@ -1,0 +1,4 @@
+interface:
+  display_name: "Topic Framing"
+  short_description: "Plan scope and search constraints before retrieval."
+  default_prompt: "Use $topic-framing to create a topic framing brief before literature search."

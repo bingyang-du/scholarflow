@@ -1,0 +1,42 @@
+project:
+  name: pentene_zsm5
+
+paths:
+  references_inbox: references/inbox
+  references_library: references/library
+  references_index: references/index
+  records_jsonl: references/index/records.jsonl
+  cards_jsonl: references/index/cards.jsonl
+  screening_decisions_csv: references/index/screening_decisions.csv
+  included_candidates_csv: references/index/included_candidates.csv
+  refs_bib: draft/latex/refs.bib
+  search_sources_csv: references/index/search_sources.csv
+  candidates_csv: references/index/candidates.csv
+  draft_runs: draft/runs
+  logs: logs
+
+enrichment:
+  doi_api: https://api.crossref.org/works/{doi}
+  arxiv_api: http://export.arxiv.org/api/query?id_list={arxiv_id}
+  request_timeout_seconds: 20
+
+dedup:
+  title_year_similarity_threshold: 0.93
+
+pipeline:
+  enable_keyword_search: true
+  enable_manual_pdf_ingest: true
+  enable_doi_arxiv_enrichment: true
+  enable_candidate_search: true
+  enable_cardify: true
+  enable_screening: true
+  write_run_manifest: true
+
+candidate_search:
+  backend_order:
+    - openalex
+    - crossref
+    - arxiv
+    - mcp
+  max_queries: 12
+  rows_per_source: 20

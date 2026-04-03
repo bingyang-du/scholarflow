@@ -1,0 +1,4 @@
+interface:
+  display_name: "Literature Screening"
+  short_description: "Screen candidate cards into include/exclude/unsure."
+  default_prompt: "Use $literature-screening to run title+abstract screening and produce decisions.csv plus included.csv."

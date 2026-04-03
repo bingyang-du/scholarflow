@@ -1,0 +1,4 @@
+interface:
+  display_name: "Literature Search Candidate"
+  short_description: "Build auditable candidate pools before screening."
+  default_prompt: "Use $literature-search-candidate to generate candidate metadata and source logs from TFR-1 without downloading PDFs."

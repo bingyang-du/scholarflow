@@ -1,0 +1,4 @@
+interface:
+  display_name: "Literature Argument Outline"
+  short_description: "Turn included evidence into argument graph and chapter skeleton."
+  default_prompt: "Use $literature-argument-outline to classify claims, map evidence to sub-questions, and generate a research-question-driven outline from included candidates."
