@@ -343,6 +343,28 @@ FULL_DRAFT_SCORE_DEDUCTIONS = {
 SECTION_GATE_DEDUCTIONS = {"high": 20, "medium": 8, "low": 3}
 SECTION_GATE_DECISIONS = ("go", "revise", "block")
 FIGURE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".pdf", ".eps", ".svg"}
+PIPELINE_STAGE_ORDER = [
+    "search-candidates",
+    "cardify-candidates",
+    "screen-candidates",
+    "fetch-fulltext",
+    "outline-from-evidence",
+    "generate-paragraph-plans",
+    "assemble-evidence-packets",
+    "generate-section-drafts",
+    "revise-section-consistency",
+    "section-citation-audit",
+    "section-release-gate",
+    "generate-cross-section-bridges",
+    "export-claim-trace-matrix",
+    "ground-figure-table-links",
+    "generate-latex-draft",
+    "assemble-full-draft",
+    "citation-audit",
+    "latex-build-qa",
+]
+PIPELINE_STAGE_ALIASES = {"full-draft": "assemble-full-draft"}
+PIPELINE_STAGE_CHOICES = PIPELINE_STAGE_ORDER + ["full-draft"]
 
 
 @dataclass(frozen=True)
@@ -3324,6 +3346,366 @@ def section_sort_key(path: Path) -> tuple[int, str]:
         except Exception:
             pass
     return 999999, path.stem
+
+
+def normalize_pipeline_stage_name(stage_name: str) -> str:
+    cleaned = compact_whitespace(stage_name).lower()
+    return PIPELINE_STAGE_ALIASES.get(cleaned, cleaned)
+
+
+def list_pipeline_stages(with_fulltext: bool) -> list[str]:
+    if with_fulltext:
+        return list(PIPELINE_STAGE_ORDER)
+    return [stage for stage in PIPELINE_STAGE_ORDER if stage != "fetch-fulltext"]
+
+
+def snapshot_run_manifests(runs_dir: Path) -> dict[str, Path]:
+    if not runs_dir.exists():
+        return {}
+    return {str(path.resolve()): path.resolve() for path in runs_dir.glob("run_*/manifest.json") if path.is_file()}
+
+
+def resolve_new_manifest_path(before: dict[str, Path], after: dict[str, Path]) -> Path | None:
+    new_paths = [after[key] for key in sorted(after.keys()) if key not in before]
+    if not new_paths:
+        return None
+    return sorted(new_paths, key=lambda path: (path.parent.name, str(path)))[-1]
+
+
+def load_manifest_payload(path: Path | None) -> dict[str, Any]:
+    if not path or not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def pipeline_stage_handler(stage_name: str):
+    handlers = {
+        "search-candidates": search_candidates,
+        "cardify-candidates": cardify_candidates,
+        "screen-candidates": screen_candidates,
+        "fetch-fulltext": fetch_fulltext,
+        "outline-from-evidence": outline_from_evidence,
+        "generate-paragraph-plans": generate_paragraph_plans,
+        "assemble-evidence-packets": assemble_evidence_packets,
+        "generate-section-drafts": generate_section_drafts,
+        "revise-section-consistency": revise_section_consistency,
+        "section-citation-audit": section_citation_audit,
+        "section-release-gate": section_release_gate,
+        "generate-cross-section-bridges": generate_cross_section_bridges,
+        "export-claim-trace-matrix": export_claim_trace_matrix,
+        "ground-figure-table-links": ground_figure_table_links,
+        "generate-latex-draft": generate_latex_draft,
+        "assemble-full-draft": assemble_full_draft,
+        "citation-audit": citation_audit,
+        "latex-build-qa": latex_build_qa,
+    }
+    return handlers[stage_name]
+
+
+def build_pipeline_stage_args(
+    stage_name: str,
+    run_args: argparse.Namespace,
+    paths: RepositoryPaths,
+    *,
+    section_tex: str = "",
+    section_stem: str = "",
+    section_consistency_report_json: str = "",
+    section_audit_json: str = "",
+) -> argparse.Namespace:
+    base_payload: dict[str, Any] = {
+        "base_dir": str(paths.root),
+    }
+
+    if stage_name == "search-candidates":
+        base_payload.update(
+            {
+                "topic_frame_json": run_args.topic_frame_json,
+                "max_queries": 12,
+                "rows_per_source": 20,
+                "backend_order": ",".join(DEFAULT_BACKEND_ORDER),
+            }
+        )
+    elif stage_name == "cardify-candidates":
+        base_payload.update(
+            {
+                "candidates_csv": "",
+                "records_jsonl": "",
+                "cards_jsonl": "",
+                "overwrite_existing": False,
+            }
+        )
+    elif stage_name == "screen-candidates":
+        base_payload.update(
+            {
+                "candidates_csv": "",
+                "cards_jsonl": "",
+                "screening_decisions_csv": "",
+                "included_candidates_csv": "",
+                "allow_auto_minimal_cards": False,
+            }
+        )
+    elif stage_name == "fetch-fulltext":
+        base_payload.update(
+            {
+                "included_candidates_csv": "",
+                "cards_jsonl": "",
+                "records_jsonl": "",
+                "download_log_csv": "",
+                "downloaded_index_csv": "",
+                "library_dir": "",
+                "max_retries": 1,
+                "timeout_seconds": REQUEST_TIMEOUT_SECONDS,
+            }
+        )
+    elif stage_name == "outline-from-evidence":
+        base_payload.update(
+            {
+                "topic_frame_json": run_args.topic_frame_json,
+                "cards_jsonl": "",
+                "included_candidates_csv": "",
+                "argument_graph_json": "",
+                "claims_jsonl": "",
+                "outline_markdown": "",
+            }
+        )
+    elif stage_name == "generate-paragraph-plans":
+        base_payload.update(
+            {
+                "outline_markdown": "",
+                "argument_graph_json": "",
+                "claims_jsonl": "",
+                "paragraph_plans_dir": "",
+                "overwrite": bool(run_args.overwrite),
+            }
+        )
+    elif stage_name == "assemble-evidence-packets":
+        base_payload.update(
+            {
+                "paragraph_plans_dir": "",
+                "claims_jsonl": "",
+                "cards_jsonl": "",
+                "included_candidates_csv": "",
+                "bib_path": "",
+                "packet_overrides_json": "",
+                "evidence_packets_dir": "",
+                "overwrite": bool(run_args.overwrite),
+            }
+        )
+    elif stage_name == "generate-section-drafts":
+        base_payload.update(
+            {
+                "paragraph_plans_dir": "",
+                "evidence_packets_dir": "",
+                "section_roles_json": "",
+                "latex_sections_dir": "",
+                "latex_template_path": "",
+                "overwrite": bool(run_args.overwrite),
+            }
+        )
+    elif stage_name == "revise-section-consistency":
+        base_payload.update(
+            {
+                "latex_sections_dir": "",
+                "argument_graph_json": "",
+                "section_drafts_dir": "",
+                "consistency_report_json": "",
+                "strictness": run_args.strictness,
+                "overwrite": bool(run_args.overwrite),
+            }
+        )
+    elif stage_name == "section-citation-audit":
+        base_payload.update(
+            {
+                "section_tex": section_tex,
+                "bib_path": "",
+                "evidence_packets_dir": "",
+                "claims_jsonl": "",
+                "records_jsonl": "",
+                "section_drafts_dir": "",
+                "audit_output_dir": "",
+                "strictness": run_args.strictness,
+            }
+        )
+    elif stage_name == "section-release-gate":
+        base_payload.update(
+            {
+                "section_stem": section_stem,
+                "section_consistency_report_json": section_consistency_report_json,
+                "section_audit_json": section_audit_json,
+                "gate_output_json": "",
+                "gate_fixlist_md": "",
+                "strictness": run_args.strictness,
+                "overwrite": bool(run_args.overwrite),
+            }
+        )
+    elif stage_name == "generate-cross-section-bridges":
+        base_payload.update(
+            {
+                "latex_sections_dir": "",
+                "argument_graph_json": "",
+                "bridge_plan_json": "",
+                "bridges_tex": "",
+                "overwrite": bool(run_args.overwrite),
+            }
+        )
+    elif stage_name == "export-claim-trace-matrix":
+        base_payload.update(
+            {
+                "claims_jsonl": "",
+                "paragraph_plans_dir": "",
+                "evidence_packets_dir": "",
+                "bib_path": "",
+                "claim_trace_matrix_csv": "",
+                "claim_trace_matrix_json": "",
+                "strictness": run_args.strictness,
+                "overwrite": bool(run_args.overwrite),
+            }
+        )
+    elif stage_name == "ground-figure-table-links":
+        base_payload.update(
+            {
+                "latex_sections_dir": "",
+                "figures_dir": "",
+                "tables_dir": "",
+                "evidence_packets_dir": "",
+                "figure_table_grounding_md": "",
+                "figure_table_manifest_json": "",
+                "strictness": run_args.strictness,
+                "overwrite": bool(run_args.overwrite),
+            }
+        )
+    elif stage_name == "generate-latex-draft":
+        base_payload.update(
+            {
+                "argument_graph_json": "",
+                "claims_jsonl": "",
+                "included_candidates_csv": "",
+                "records_jsonl": "",
+                "refs_bib": "",
+                "latex_dir": "",
+                "figures_dir": "",
+                "tables_dir": "",
+                "overwrite": bool(run_args.overwrite),
+            }
+        )
+    elif stage_name == "assemble-full-draft":
+        base_payload.update(
+            {
+                "latex_sections_dir": "",
+                "section_audit_dir": "",
+                "bib_path": "",
+                "abstract_template": "",
+                "conclusion_template": "",
+                "output_main_tex": "",
+                "output_full_draft_tex": "",
+                "full_draft_review_md": "",
+                "strictness": run_args.strictness,
+                "overwrite": bool(run_args.overwrite),
+            }
+        )
+    elif stage_name == "citation-audit":
+        base_payload.update(
+            {
+                "latex_dir": "",
+                "main_tex": "",
+                "outline_tex": "",
+                "bib_path": "",
+                "argument_graph_json": "",
+                "claims_jsonl": "",
+                "records_jsonl": "",
+                "included_candidates_csv": "",
+                "audit_overrides_json": "",
+                "audit_output_dir": "",
+                "strictness": run_args.strictness,
+            }
+        )
+    elif stage_name == "latex-build-qa":
+        base_payload.update(
+            {
+                "target": "full",
+                "main_tex": "",
+                "full_draft_tex": "",
+                "bib_path": "",
+                "latex_build_report_md": "",
+                "latex_build_log_txt": "",
+                "run_compiler": bool(run_args.run_compiler),
+                "strictness": run_args.strictness,
+                "overwrite": bool(run_args.overwrite),
+            }
+        )
+
+    return argparse.Namespace(**base_payload)
+
+
+def run_pipeline_stage(stage_name: str, stage_args: argparse.Namespace, paths: RepositoryPaths) -> dict[str, Any]:
+    before = snapshot_run_manifests(paths.runs_dir)
+    started_at = local_now()
+    exit_code = 0
+    exception_message = ""
+    try:
+        exit_code = int(pipeline_stage_handler(stage_name)(stage_args))
+    except Exception as exc:
+        exit_code = 1
+        exception_message = str(exc)
+    finished_at = local_now()
+    after = snapshot_run_manifests(paths.runs_dir)
+    manifest_path = resolve_new_manifest_path(before, after)
+    manifest_payload = load_manifest_payload(manifest_path)
+    manifest_status = compact_whitespace(manifest_payload.get("status")).lower()
+
+    stage_status = "ok"
+    if exception_message:
+        stage_status = "failed"
+    elif exit_code != 0:
+        stage_status = "failed"
+    elif manifest_status == "failed":
+        stage_status = "failed"
+
+    return {
+        "stage": stage_name,
+        "status": stage_status,
+        "exit_code": exit_code,
+        "manifest": str(manifest_path) if manifest_path else "",
+        "manifest_status": manifest_status,
+        "duration_seconds": round((finished_at - started_at).total_seconds(), 3),
+        "error": exception_message,
+        "outputs": manifest_payload.get("outputs", {}) if isinstance(manifest_payload, dict) else {},
+    }
+
+
+def render_pipeline_run_summary_markdown(
+    selected_stages: list[str],
+    stage_results: list[dict[str, Any]],
+    overall_status: str,
+    failed_stage: dict[str, Any] | None,
+) -> str:
+    lines = [
+        "# Pipeline Run Summary",
+        "",
+        f"- Status: {overall_status}",
+        f"- Stage Count: {len(selected_stages)}",
+    ]
+    if failed_stage:
+        lines.append(f"- Failure Point: {failed_stage.get('stage')} ({failed_stage.get('target') or 'single'})")
+    lines.extend(["", "## Stage Results"])
+    if not stage_results:
+        lines.append("- No stage executed.")
+    else:
+        for row in stage_results:
+            target = compact_whitespace(row.get("target"))
+            target_text = f" [{target}]" if target else ""
+            lines.append(
+                f"- {row.get('stage')}{target_text}: status={row.get('status')} exit={row.get('exit_code')} "
+                f"manifest={row.get('manifest') or 'N/A'}"
+            )
+            if row.get("error"):
+                lines.append(f"  error: {row.get('error')}")
+    lines.append("")
+    return "\n".join(lines)
 
 
 def extract_label_keys(text: str) -> list[str]:
@@ -9111,6 +9493,231 @@ def enrich_reference(args: argparse.Namespace) -> int:
     return 0
 
 
+def run_pipeline(args: argparse.Namespace) -> int:
+    base_dir = Path(args.base_dir).resolve() if args.base_dir else None
+    paths = resolve_paths(base_dir=base_dir)
+    ensure_workspace(paths)
+
+    run_id, run_dir = create_run_dir(paths.runs_dir)
+    now_iso = local_now().isoformat(timespec="seconds")
+    errors: list[dict[str, str]] = []
+    warnings: list[dict[str, str]] = []
+    status = "ok"
+
+    from_stage = normalize_pipeline_stage_name(args.from_stage)
+    to_stage = normalize_pipeline_stage_name(args.to_stage)
+    with_fulltext = bool(args.with_fulltext)
+    continue_on_error = bool(args.continue_on_error)
+    strictness = compact_whitespace(args.strictness).lower() or "soft"
+    overwrite = bool(args.overwrite)
+    run_compiler = bool(args.run_compiler)
+
+    stage_chain = list_pipeline_stages(with_fulltext=with_fulltext)
+    if from_stage not in stage_chain:
+        status = "failed"
+        errors.append({"source": "from_stage", "message": f"Unsupported from-stage in current mode: {from_stage}"})
+    if to_stage not in stage_chain:
+        status = "failed"
+        errors.append({"source": "to_stage", "message": f"Unsupported to-stage in current mode: {to_stage}"})
+
+    if status == "ok":
+        from_index = stage_chain.index(from_stage)
+        to_index = stage_chain.index(to_stage)
+        if from_index > to_index:
+            status = "failed"
+            errors.append({"source": "stage_range", "message": f"from-stage {from_stage} is after to-stage {to_stage}"})
+            selected_stages: list[str] = []
+        else:
+            selected_stages = stage_chain[from_index : to_index + 1]
+    else:
+        selected_stages = []
+
+    requires_topic_frame = any(stage in {"search-candidates", "outline-from-evidence"} for stage in selected_stages)
+    topic_frame_json = compact_whitespace(args.topic_frame_json)
+    if requires_topic_frame and not topic_frame_json:
+        status = "failed"
+        errors.append({"source": "topic_frame_json", "message": "topic_frame_json is required for selected stage range."})
+    if requires_topic_frame and topic_frame_json:
+        topic_frame_path = Path(topic_frame_json).resolve()
+        if not topic_frame_path.exists():
+            status = "failed"
+            errors.append({"source": "topic_frame_json", "message": f"File not found: {topic_frame_path}"})
+
+    stage_results: list[dict[str, Any]] = []
+    failed_stage: dict[str, Any] | None = None
+    section_consistency_report_json = ""
+    section_audit_json_by_stem: dict[str, str] = {}
+
+    if status == "ok":
+        should_stop = False
+        for stage_name in selected_stages:
+            if should_stop:
+                break
+
+            if stage_name in {"section-citation-audit", "section-release-gate"}:
+                section_files = sorted(
+                    [path for path in (paths.root / "draft" / "latex" / "sections").glob("sec_*.tex") if path.is_file()],
+                    key=section_sort_key,
+                )
+                if not section_files:
+                    result = {
+                        "stage": stage_name,
+                        "target": "",
+                        "status": "failed",
+                        "exit_code": 1,
+                        "manifest": "",
+                        "manifest_status": "",
+                        "duration_seconds": 0,
+                        "error": f"No section tex files found under {(paths.root / 'draft' / 'latex' / 'sections')}",
+                        "outputs": {},
+                    }
+                    stage_results.append(result)
+                    if failed_stage is None:
+                        failed_stage = result
+                    if not continue_on_error:
+                        should_stop = True
+                    continue
+
+                for section_file in section_files:
+                    section_stem = section_file.stem
+                    stage_args = build_pipeline_stage_args(
+                        stage_name,
+                        args,
+                        paths,
+                        section_tex=str(section_file),
+                        section_stem=section_stem,
+                        section_consistency_report_json=section_consistency_report_json,
+                        section_audit_json=section_audit_json_by_stem.get(section_stem, ""),
+                    )
+                    result = run_pipeline_stage(stage_name, stage_args, paths)
+                    result["target"] = section_stem
+                    stage_results.append(result)
+
+                    if stage_name == "section-citation-audit":
+                        outputs = result.get("outputs", {}) if isinstance(result.get("outputs"), dict) else {}
+                        section_audit_json = compact_whitespace(outputs.get("section_audit_json"))
+                        if section_audit_json:
+                            section_audit_json_by_stem[section_stem] = section_audit_json
+
+                    if result.get("status") == "failed":
+                        if failed_stage is None:
+                            failed_stage = result
+                        if not continue_on_error:
+                            should_stop = True
+                            break
+                continue
+
+            stage_args = build_pipeline_stage_args(stage_name, args, paths)
+            result = run_pipeline_stage(stage_name, stage_args, paths)
+            result["target"] = ""
+            stage_results.append(result)
+
+            if stage_name == "revise-section-consistency":
+                outputs = result.get("outputs", {}) if isinstance(result.get("outputs"), dict) else {}
+                section_consistency_report_json = compact_whitespace(outputs.get("section_consistency_report_json"))
+
+            if result.get("status") == "failed":
+                if failed_stage is None:
+                    failed_stage = result
+                if not continue_on_error:
+                    should_stop = True
+
+    if any(row.get("status") == "failed" for row in stage_results):
+        status = "failed"
+
+    summary_payload = {
+        "run_id": run_id,
+        "timestamp": now_iso,
+        "inputs": {
+            "from_stage": from_stage,
+            "to_stage": to_stage,
+            "with_fulltext": with_fulltext,
+            "strictness": strictness,
+            "overwrite": overwrite,
+            "run_compiler": run_compiler,
+            "continue_on_error": continue_on_error,
+            "topic_frame_json": topic_frame_json,
+        },
+        "status": status,
+        "selected_stages": selected_stages,
+        "executed_stage_count": len(stage_results),
+        "stage_results": stage_results,
+        "failure_point": {
+            "stage": failed_stage.get("stage"),
+            "target": failed_stage.get("target"),
+            "error": failed_stage.get("error"),
+        }
+        if failed_stage
+        else None,
+        "warnings": warnings,
+        "errors": errors,
+    }
+
+    summary_json_path = run_dir / "pipeline_run_summary.json"
+    summary_md_path = run_dir / "pipeline_run_summary.md"
+    try:
+        summary_json_path.write_text(json.dumps(summary_payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        summary_md_path.write_text(
+            render_pipeline_run_summary_markdown(
+                selected_stages=selected_stages,
+                stage_results=stage_results,
+                overall_status=status,
+                failed_stage=failed_stage,
+            ),
+            encoding="utf-8",
+        )
+    except Exception as exc:
+        status = "failed"
+        errors.append({"source": "pipeline_run_summary", "message": str(exc)})
+
+    manifest = {
+        "run_id": run_id,
+        "timestamp": now_iso,
+        "inputs": summary_payload["inputs"],
+        "status": status,
+        "outputs": {
+            "pipeline_run_summary_json": str(summary_json_path),
+            "pipeline_run_summary_md": str(summary_md_path),
+            "selected_stage_count": len(selected_stages),
+            "executed_stage_count": len(stage_results),
+            "failed_stage_count": len([row for row in stage_results if row.get("status") == "failed"]),
+        },
+        "warnings": warnings,
+        "errors": errors,
+    }
+    manifest_path = write_manifest(run_dir, manifest)
+
+    if errors:
+        append_log(paths, "WARN", "run_pipeline_with_errors", {"run_id": run_id, "errors": errors})
+    append_log(
+        paths,
+        "INFO",
+        "run_pipeline_completed",
+        {
+            "run_id": run_id,
+            "status": status,
+            "selected_stage_count": len(selected_stages),
+            "executed_stage_count": len(stage_results),
+            "failed_stage_count": len([row for row in stage_results if row.get("status") == "failed"]),
+        },
+    )
+    print(
+        json.dumps(
+            {
+                "status": status,
+                "run_id": run_id,
+                "manifest": str(manifest_path.relative_to(paths.root)) if paths.root in manifest_path.parents else str(manifest_path),
+                "outputs": manifest["outputs"],
+                "warnings": warnings,
+                "errors": errors,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Reference pipeline with DOI/arXiv enrichment + JSONL/BibTeX persistence."
@@ -9881,6 +10488,55 @@ def build_parser() -> argparse.ArgumentParser:
         help="Overwrite generated outputs. Default false to preserve manual edits.",
     )
     latex_build_qa_parser.set_defaults(func=latex_build_qa)
+
+    run_parser = subparsers.add_parser(
+        "run",
+        help="Run the pipeline through selected stages with a single beginner-friendly command.",
+    )
+    run_parser.add_argument(
+        "--topic-frame-json",
+        default="",
+        help="Path to topic frame JSON/YAML. Required when selected stages include search-candidates or outline-from-evidence.",
+    )
+    run_parser.add_argument(
+        "--from-stage",
+        default="search-candidates",
+        choices=PIPELINE_STAGE_CHOICES,
+        help="Start stage (default: search-candidates).",
+    )
+    run_parser.add_argument(
+        "--to-stage",
+        default="full-draft",
+        choices=PIPELINE_STAGE_CHOICES,
+        help="End stage (default: full-draft, alias of assemble-full-draft).",
+    )
+    run_parser.add_argument(
+        "--with-fulltext",
+        action="store_true",
+        help="Include fetch-fulltext stage in the run chain. Default false.",
+    )
+    run_parser.add_argument(
+        "--strictness",
+        default="soft",
+        choices=["soft", "hard"],
+        help="Strictness policy for supporting stages (default: soft).",
+    )
+    run_parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Allow overwrite for supporting stages that honor overwrite semantics.",
+    )
+    run_parser.add_argument(
+        "--run-compiler",
+        action="store_true",
+        help="Enable compiler execution when latex-build-qa stage is selected.",
+    )
+    run_parser.add_argument(
+        "--continue-on-error",
+        action="store_true",
+        help="Continue executing next stage even if one stage fails. Default false (fail-fast).",
+    )
+    run_parser.set_defaults(func=run_pipeline)
 
     enrich = subparsers.add_parser("enrich", help="Enrich one reference and persist it.")
     enrich.add_argument("--doi", help="DOI identifier, e.g. 10.1021/acscatal.0c01234")
