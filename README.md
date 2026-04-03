@@ -1,4 +1,4 @@
-﻿# pentene_zsm5 研究生产线
+﻿# pentene_zsm5 auto research line
 
 本项目把“选题 -> 检索 -> 卡片化 -> 筛选 -> 论证 -> 写作 -> 审计”拆成可追溯的阶段。  
 默认优先结构化中间层，不默认下载全部 PDF。
